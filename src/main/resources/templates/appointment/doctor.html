@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>医生预约管理</title>
+
+  <!-- Vue2 + Axios（CDN 引入，体现前后端分离） -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; }
+    .row { margin: 10px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    table { border-collapse: collapse; width: 950px; max-width: 100%; }
+    th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; }
+    th { background: #f5f5f5; }
+
+    .status-booked { color: #1a7f37; font-weight: bold; }
+    .status-cancel { color: #666; font-weight: bold; }
+    .status-finish { color: #1f6feb; font-weight: bold; }
+
+    .btn { padding: 4px 10px; cursor: pointer; }
+    .btn-primary { border: 1px solid #1f6feb; background: #fff; color: #1f6feb; }
+    .btn-normal { border: 1px solid #666; background: #fff; color: #333; }
+    .btn-disabled { border: 1px solid #ccc; background: #f7f7f7; color: #999; cursor: not-allowed; }
+    .badge { font-size: 12px; color: #333; }
+  </style>
+</head>
+<body>
+
+<h2>医生预约管理</h2>
+
+<div id="app">
+
+  <div class="row">
+    <button class="btn btn-normal" @click="refresh">刷新</button>
+
+    <!-- 关键点：筛选走后端（status 参数） -->
+    筛选：
+    <select v-model="filterStatus" @change="onFilterChange">
+      <option value="ALL">全部</option>
+      <option value="BOOKED">仅已预约</option>
+      <option value="CANCELLED">已取消</option>
+      <option value="FINISHED">已完成</option>
+    </select>
+
+    每页：
+    <select v-model.number="pageSize" @change="changePageSize">
+      <option :value="5">5</option>
+      <option :value="10">10</option>
+      <option :value="20">20</option>
+    </select>
+
+    <span class="badge">
+            总数：{{ total }}，当前页：{{ current }} / {{ pages }}
+        </span>
+  </div>
+
+  <div class="row">
+    <button
+            class="btn"
+            :class="current<=1 ? 'btn-disabled' : 'btn-normal'"
+            :disabled="current<=1"
+            @click="goPrev">
+      上一页
+    </button>
+
+    <button
+            class="btn"
+            :class="current>=pages ? 'btn-disabled' : 'btn-normal'"
+            :disabled="current>=pages"
+            @click="goNext">
+      下一页
+    </button>
+  </div>
+
+  <table>
+    <tr>
+      <th>ID</th>
+      <th>患者</th>
+      <th>预约时间</th>
+      <th>状态</th>
+      <th>操作</th>
+    </tr>
+
+    <!-- list 即后端筛选后的 records -->
+    <tr v-for="item in list" :key="item.id">
+      <td>{{ item.id }}</td>
+      <td>{{ getPatientName(item.patientId) }}</td>
+      <td>{{ formatTime(item.appointmentTime) }}</td>
+      <td>
+                <span :class="statusClass(item.status)">
+                    {{ statusText(item.status) }}
+                </span>
+      </td>
+      <td>
+        <!-- 只有 BOOKED 才可完成，体现业务状态流转 -->
+        <button
+                v-if="item.status==='BOOKED'"
+                class="btn btn-primary"
+                @click="finish(item.id)">
+          完成
+        </button>
+        <span v-else>-</span>
+      </td>
+    </tr>
+  </table>
+
+</div>
+
+<script>
+  new Vue({
+    el: '#app',
+    data: {
+      // 分页数据
+      list: [],
+      total: 0,
+      current: 1,
+      pages: 1,
+      pageSize: 5,
+
+      // 后端筛选参数
+      filterStatus: 'ALL',
+
+      // 患者字典：用于 patientId -> patientName 映射
+      patients: []
+    },
+    mounted() {
+      // 页面初始化：先加载患者字典，再加载第一页
+      this.loadPatients();
+      this.loadPage(1);
+    },
+    methods: {
+
+      // 加载患者字典（用于显示患者姓名）
+      loadPatients() {
+        axios.get('/api/patient/options')
+                .then(res => {
+                  if (res.data.success) {
+                    this.patients = res.data.data || [];
+                  } else {
+                    alert(res.data.message);
+                  }
+                })
+                .catch(() => {
+                  alert("加载患者列表失败：请确认后端 /api/patient/options 可访问");
+                });
+      },
+
+      // patientId -> patientName
+      getPatientName(patientId) {
+        const p = this.patients.find(x => x.id == patientId);
+        return p ? p.name : ('患者ID:' + patientId);
+      },
+
+      // 分页加载（关键：把 status 传给后端）
+      loadPage(page) {
+        axios.get('/api/appointment/doctor/page', {
+          params: {
+            page: page,
+            size: this.pageSize,
+            status: this.filterStatus   // 后端筛选参数
+          }
+        }).then(res => {
+          if (res.data.success) {
+            const p = res.data.data;
+            this.list = p.records || [];
+            this.total = p.total || 0;
+            this.current = p.current || 1;
+            this.pages = p.pages || 1;
+          } else {
+            alert(res.data.message);
+          }
+        });
+      },
+
+      // 刷新当前页
+      refresh() {
+        this.loadPage(this.current);
+      },
+
+      // 切换筛选条件：回到第一页
+      onFilterChange() {
+        this.loadPage(1);
+      },
+
+      // 修改每页条数：回到第一页
+      changePageSize() {
+        this.loadPage(1);
+      },
+
+      // 翻页
+      goPrev() {
+        if (this.current > 1) this.loadPage(this.current - 1);
+      },
+      goNext() {
+        if (this.current < this.pages) this.loadPage(this.current + 1);
+      },
+
+      // 完成预约：成功后刷新当前页
+      finish(id) {
+        axios.put('/api/appointment/' + id + '/finish')
+                .then(res => {
+                  if (res.data.success) {
+                    alert("已完成");
+                    this.refresh();
+                  } else {
+                    alert(res.data.message);
+                  }
+                });
+      },
+
+      // 时间格式化
+      formatTime(timeStr) {
+        if (!timeStr) return '';
+        return timeStr.replace('T', ' ').substring(0, 16);
+      },
+
+      // 状态文本
+      statusText(status) {
+        if (status === 'BOOKED') return '已预约';
+        if (status === 'CANCELLED') return '已取消';
+        if (status === 'FINISHED') return '已完成';
+        return status || '';
+      },
+
+      // 状态样式
+      statusClass(status) {
+        if (status === 'BOOKED') return 'status-booked';
+        if (status === 'CANCELLED') return 'status-cancel';
+        if (status === 'FINISHED') return 'status-finish';
+        return '';
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

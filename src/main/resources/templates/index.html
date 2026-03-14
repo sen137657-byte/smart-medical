@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>智慧医疗系统-首页</title>
+</head>
+<body>
+<h1>智慧医疗系统</h1>
+<hr>
+
+<!-- 当前登录信息：先判空，避免 session.loginUser 为空时报错 -->
+<div>
+  当前账号：
+  <b th:text="${session.loginUser != null ? session.loginUser.username : '未登录'}">phone</b>
+  ，角色：
+  <b th:text="${session.loginUser != null ? session.loginUser.role : '-'}">role</b>
+</div>
+
+<div th:if="${session.loginUser == null}">
+  当前状态：<b>未登录</b>
+  <a href="/login.html">去登录</a>
+</div>
+
+<hr>
+
+<!-- 只有登录后才显示菜单 -->
+<div th:if="${session.loginUser != null}">
+
+  <!-- ADMIN 菜单 -->
+  <div th:if="${session.loginUser != null and session.loginUser.role == 'ADMIN'}">
+    <h3>管理员功能</h3>
+    <ul>
+      <li><a href="/dept/list-page">科室管理</a></li>
+      <li><a href="/doctor/list-page">医生管理</a></li>
+      <li><a href="/patient/list-page">患者管理</a></li>
+    </ul>
+  </div>
+
+  <!-- DOCTOR 菜单 -->
+  <div th:if="${session.loginUser != null and session.loginUser.role == 'DOCTOR'}">
+    <h3>医生功能</h3>
+    <ul>
+      <li><a href="/doctor/my-page">我的医生档案</a></li>
+      <li><a href="/appointment/doctor-page">预约管理</a></li>
+      <li><a href="/consultation/doctor-page">在线问诊</a></li>
+      <li><a href="/medicalRecord/doctor-page">病历管理</a></li>
+    </ul>
+    <p style="color:#666;">提示：医生账号无法访问科室/医生/患者管理列表页面。</p>
+  </div>
+
+  <!-- PATIENT 菜单 -->
+  <div th:if="${session.loginUser != null and session.loginUser.role == 'PATIENT'}">
+    <h3>患者功能</h3>
+    <ul>
+      <li><a href="/patient/my-page">我的患者档案</a></li>
+      <li><a href="/appointment/patient-page">预约管理</a></li>
+      <li><a href="/consultation/patient-page">在线问诊</a></li>
+      <li><a href="/medicalRecord/patient-page">我的病历</a></li>
+    </ul>
+    <p style="color:#666;">提示：患者账号无法访问科室/医生/患者管理列表页面。</p>
+  </div>
+
+  <hr>
+  <p><a href="/auth/logout">退出登录</a></p>
+</div>
+
+<!-- 弹窗提示：显示 PageController 从 session.msg 转过来的 model.msg -->
+<script th:inline="javascript">
+  /*<![CDATA[*/
+  const modelMsg = /*[[${msg}]]*/ null;
+  if (modelMsg) {
+    alert(modelMsg);
+  }
+  /*]]>*/
+</script>
+
+</body>
+</html>

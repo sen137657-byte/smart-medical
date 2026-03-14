@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8"/>
+  <title>患者管理</title>
+</head>
+<body>
+
+<h1>患者管理</h1>
+<p>
+  <a href="/patient/add-page">新增患者</a> |
+  <a href="/">返回首页</a>
+</p>
+
+<form method="get" action="/patient/list-page">
+  患者姓名：
+  <input type="text" name="name" placeholder="输入姓名" th:value="${name}">
+  每页条数：
+  <select name="pageSize">
+    <option value="5"  th:selected="${pageSize == 5}">5</option>
+    <option value="10" th:selected="${pageSize == 10}">10</option>
+    <option value="20" th:selected="${pageSize == 20}">20</option>
+  </select>
+  <button type="submit">查询</button>
+</form>
+
+<hr/>
+
+<table border="1" cellspacing="0" cellpadding="6">
+  <thead>
+  <tr>
+    <th>ID</th>
+    <th>用户ID</th>
+    <th>姓名</th>
+    <th>性别</th>
+    <th>年龄</th>
+    <th>电话</th>
+    <th>地址</th>
+    <th>创建时间</th>
+    <th>操作</th>
+  </tr>
+  </thead>
+
+  <tbody>
+  <tr th:if="${patientList == null || #lists.isEmpty(patientList)}">
+    <td colspan="9">暂无数据</td>
+  </tr>
+
+  <tr th:each="p : ${patientList}">
+    <td th:text="${p.id}"></td>
+    <td th:text="${p.userId}"></td>
+    <td th:text="${p.name}"></td>
+    <td th:text="${p.gender}"></td>
+    <td th:text="${p.age}"></td>
+    <td th:text="${p.phone}"></td>
+    <td th:text="${p.address}"></td>
+    <td th:text="${p.createTime}"></td>
+    <td>
+      <a th:href="@{/patient/edit-page/{id}(id=${p.id})}">编辑</a>
+      |
+      <a th:href="@{/patient/delete/{id}(id=${p.id})}"
+         onclick="return confirm('确定删除吗？')">删除</a>
+    </td>
+  </tr>
+  </tbody>
+</table>
+
+<br/>
+
+<div>
+  共 <span th:text="${page.total}"></span> 条，
+  当前第 <span th:text="${page.current}"></span> 页，
+  共 <span th:text="${page.pages}"></span> 页
+</div>
+
+<div style="margin-top:10px;">
+  <a th:if="${page.current > 1}"
+     th:href="@{/patient/list-page(pageNum=${page.current-1}, pageSize=${page.size}, name=${name})}">上一页</a>
+  <span th:if="${page.current <= 1}">上一页</span>
+
+  &nbsp; | &nbsp;
+
+  <a th:if="${page.current < page.pages}"
+     th:href="@{/patient/list-page(pageNum=${page.current+1}, pageSize=${page.size}, name=${name})}">下一页</a>
+  <span th:if="${page.current >= page.pages}">下一页</span>
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const msg = params.get("msg");
+  if (msg) {
+    alert(msg);
+    params.delete("msg");
+    const newUrl = window.location.pathname + (params.toString() ? ("?" + params.toString()) : "");
+    window.history.replaceState({}, "", newUrl);
+  }
+</script>
+
+</body>
+</html>

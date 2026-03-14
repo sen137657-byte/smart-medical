@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>医生-病历管理</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body{font-family: Arial;margin:20px;}
+    table{border-collapse: collapse;width:100%;margin-top:15px;}
+    th,td{border:1px solid #ccc;padding:8px;text-align:center;}
+    button{margin:3px;}
+    .box{border:1px solid #ddd;padding:15px;margin-top:20px;border-radius:6px;}
+    input,textarea,select{width:100%;margin-top:5px;box-sizing:border-box;}
+    textarea{min-height:72px;}
+    .disabled{background:#ccc;}
+    .row{margin:10px 0;}
+    .hint{color:#666;font-size:12px;margin-top:6px;}
+    .danger{color:#b00020;font-size:12px;margin-top:6px;}
+    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;border:1px solid #ddd;}
+    .loading{opacity:.6;pointer-events:none;}
+
+    /* 状态标签 */
+    .status-tag{
+      display:inline-block;
+      padding:2px 10px;
+      border-radius:999px;
+      font-size:12px;
+      border:1px solid #ddd;
+      line-height:18px;
+    }
+    .status-draft{background:#f2f2f2;color:#333;}
+    .status-archived{background:#e8f5e9;color:#1b5e20;border-color:#c8e6c9;}
+
+    /* 详情弹窗 */
+    .modal-mask{
+      position:fixed;left:0;top:0;right:0;bottom:0;
+      background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;
+      z-index:9999;
+    }
+    .modal{
+      width:min(720px,92vw);background:#fff;border-radius:10px;padding:18px 18px 12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.2);
+    }
+    .modal h3{margin:0 0 10px 0;}
+    .kv{margin:6px 0;line-height:1.6;}
+    .kv b{display:inline-block;min-width:90px;}
+    .modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:12px;}
+  </style>
+</head>
+<body>
+
+<h2>电子病历管理（医生端）</h2>
+
+<div id="app" :class="{loading:pageLoading}">
+
+  <!-- 创建病历 -->
+  <div class="box">
+    <h3>新建病历</h3>
+
+    <div class="row">
+      <label>选择预约（仅显示 BOOKED/FINISHED 且属于当前医生）</label>
+      <select v-model="form.appointmentId">
+        <option value="">请选择预约（只显示我的预约）</option>
+        <option v-for="a in filteredAppointments" :key="a.id" :value="a.id">
+          {{ formatApptOption(a) }}
+        </option>
+      </select>
+      <div class="hint">
+        提示：一般建议选 BOOKED（就诊进行中）或 FINISHED（就诊完成）来写病历。
+      </div>
+    </div>
+
+    <div class="row">
+      <label>主诉</label>
+      <input v-model.trim="form.chiefComplaint" placeholder="如：咳嗽三天、打喷嚏等">
+    </div>
+
+    <div class="row">
+      <label>现病史</label>
+      <textarea v-model.trim="form.presentIllness" placeholder="如：症状出现时间、加重/缓解因素、伴随症状等"></textarea>
+    </div>
+
+    <div class="row">
+      <label>诊断</label>
+      <input v-model.trim="form.diagnosis" placeholder="如：上呼吸道感染、过敏性鼻炎等">
+    </div>
+
+    <div class="row">
+      <label>医嘱</label>
+      <textarea v-model.trim="form.treatmentAdvice" placeholder="如：按时服药、注意休息、复诊时间等"></textarea>
+    </div>
+
+    <div class="toolbar">
+      <button @click="create" :disabled="creating">
+        {{ creating ? '创建中...' : '创建病历' }}
+      </button>
+      <button @click="resetForm" :disabled="creating">清空表单</button>
+      <span class="tag" v-if="filteredAppointments.length">
+        可选预约：{{ filteredAppointments.length }} 条
+      </span>
+    </div>
+
+    <div class="danger" v-if="createError">{{ createError }}</div>
+  </div>
+
+  <!-- 病历列表 -->
+  <div class="box">
+    <div class="toolbar">
+      <h3 style="margin:0;">我的病历列表</h3>
+      <button @click="loadRecords" :disabled="recordsLoading">刷新</button>
+      <span class="tag" v-if="recordsLoading">加载中...</span>
+      <span class="tag" v-else>共 {{ list.length }} 条</span>
+    </div>
+
+    <table>
+      <tr>
+        <th>ID</th>
+        <th>预约ID</th>
+        <th>患者</th>
+        <th>主诉</th>
+        <th>诊断</th>
+        <th>状态</th>
+        <th>时间</th>
+        <th>操作</th>
+      </tr>
+
+      <tr v-for="r in list" :key="r.id">
+        <td>{{r.id}}</td>
+        <td>{{r.appointmentId}}</td>
+        <td>{{r.patientName}}</td>
+        <td>{{r.chiefComplaint}}</td>
+        <td>{{r.diagnosis}}</td>
+
+        <!-- 正确写法：{{ }}，并加颜色标签 -->
+        <td>
+          <span class="status-tag" :class="statusClass(r)">
+            {{ r.statusText || '未知状态' }}
+          </span>
+        </td>
+
+        <td>{{r.recordTime}}</td>
+        <td>
+          <button @click="openDetail(r)">查看</button>
+
+          <button
+                  @click="archive(r.id)"
+                  :disabled="r.status!=='DRAFT'"
+                  :class="{disabled:r.status!=='DRAFT'}">
+            归档
+          </button>
+        </td>
+      </tr>
+
+      <tr v-if="!recordsLoading && list.length===0">
+        <td colspan="8" style="color:#666;padding:18px;">暂无数据</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 详情弹窗 -->
+  <div class="modal-mask" v-if="detailVisible" @click.self="detailVisible=false">
+    <div class="modal">
+      <h3>病历详情</h3>
+      <div class="kv"><b>病历ID：</b>{{detail.id}}</div>
+      <div class="kv"><b>预约ID：</b>{{detail.appointmentId}}</div>
+      <div class="kv"><b>患者：</b>{{detail.patientName}}</div>
+      <div class="kv"><b>主诉：</b>{{detail.chiefComplaint}}</div>
+      <div class="kv"><b>现病史：</b>{{detail.presentIllness || '（无）'}}</div>
+      <div class="kv"><b>诊断：</b>{{detail.diagnosis}}</div>
+      <div class="kv"><b>医嘱：</b>{{detail.treatmentAdvice || '（无）'}}</div>
+
+      <div class="kv">
+        <b>状态：</b>
+        <span class="status-tag" :class="statusClass(detail)">
+          {{ detail.statusText || '未知状态' }}
+        </span>
+        <span style="color:#999;margin-left:8px;">（{{ detail.status || '-' }}）</span>
+      </div>
+
+      <div class="kv"><b>时间：</b>{{detail.recordTime}}</div>
+
+      <div class="modal-footer">
+        <button @click="detailVisible=false">关闭</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  new Vue({
+    el:'#app',
+    data:{
+      pageLoading:false,
+
+      appointmentList:[],
+      apptLoading:false,
+
+      list:[],
+      recordsLoading:false,
+
+      form:{
+        appointmentId:'',
+        chiefComplaint:'',
+        presentIllness:'',
+        diagnosis:'',
+        treatmentAdvice:''
+      },
+      creating:false,
+      createError:'',
+
+      detail:{},
+      detailVisible:false
+    },
+
+    computed:{
+      filteredAppointments(){
+        return (this.appointmentList || []).filter(a =>
+                a && (a.status === 'BOOKED' || a.status === 'FINISHED')
+        );
+      }
+    },
+
+    mounted(){
+      this.init();
+    },
+
+    methods:{
+      init(){
+        this.pageLoading = true;
+        Promise.all([this.loadAppointments(), this.loadRecords()])
+                .finally(()=> this.pageLoading = false);
+      },
+
+      loadAppointments(){
+        this.apptLoading = true;
+        return axios.get('/api/appointment/doctor/page', { params:{ page:1, size:200 } })
+                .then(res=>{
+                  const data = (res.data && res.data.data) || {};
+                  this.appointmentList = data.records || [];
+                })
+                .catch(e=>{
+                  console.error(e);
+                  alert(this.pickMsg(e) || '加载预约失败');
+                })
+                .finally(()=> this.apptLoading = false);
+      },
+
+      loadRecords(){
+        this.recordsLoading = true;
+        return axios.get('/api/medicalRecord/doctor')
+                .then(res=>{
+                  this.list = (res.data && res.data.data) || [];
+                })
+                .catch(e=>{
+                  console.error(e);
+                  alert(this.pickMsg(e) || '加载病历失败');
+                })
+                .finally(()=> this.recordsLoading = false);
+      },
+
+      create(){
+        this.createError = '';
+        if(this.creating) return;
+
+        if(!this.form.appointmentId){
+          this.createError = '请选择预约';
+          return;
+        }
+        if(!this.form.chiefComplaint){
+          this.createError = '主诉不能为空';
+          return;
+        }
+        if(!this.form.diagnosis){
+          this.createError = '诊断不能为空';
+          return;
+        }
+
+        this.creating = true;
+        axios.post('/api/medicalRecord', this.form)
+                .then(()=>{
+                  alert("创建成功");
+                  this.resetForm();
+                  return this.loadRecords();
+                })
+                .catch(e=>{
+                  console.error(e);
+                  this.createError = this.pickMsg(e) || '创建失败';
+                })
+                .finally(()=>{
+                  this.creating = false;
+                });
+      },
+
+      archive(id){
+        if(!confirm('确认归档该病历？归档后不可再修改。')) return;
+
+        axios.post('/api/medicalRecord/'+id+'/archive')
+                .then(()=>{
+                  alert("归档成功");
+                  return this.loadRecords();
+                })
+                .catch(e=>{
+                  console.error(e);
+                  alert(this.pickMsg(e) || '归档失败');
+                });
+      },
+
+      openDetail(row){
+        this.detail = Object.assign({}, row);
+        this.detailVisible = true;
+      },
+
+      resetForm(){
+        this.form = {
+          appointmentId:'',
+          chiefComplaint:'',
+          presentIllness:'',
+          diagnosis:'',
+          treatmentAdvice:''
+        };
+      },
+
+      formatApptOption(a){
+        return '预约#' + a.id + ' | 时间:' + (a.appointmentTime || '-') + ' | 状态:' + (a.status || '-');
+      },
+
+      pickMsg(e){
+        return e && e.response && e.response.data
+                ? (e.response.data.message || e.response.data.msg || e.response.data.error)
+                : null;
+      },
+
+      //  状态标签颜色
+      statusClass(r){
+        if(!r || !r.status) return 'status-draft';
+        if(r.status === 'ARCHIVED') return 'status-archived';
+        return 'status-draft'; // DRAFT 默认灰
+      }
+    }
+  })
+</script>
+
+</body>
+</html>

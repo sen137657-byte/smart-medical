@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8"/>
+  <title>医生管理</title>
+</head>
+<body>
+
+<h1>医生管理</h1>
+<p><a href="/doctor/add-page">新增医生</a></p>
+
+<form method="get" action="/doctor/list-page">
+  医生姓名：
+  <input type="text" name="name" placeholder="输入姓名" th:value="${name}">
+  每页条数：
+  <select name="pageSize">
+    <option value="5"  th:selected="${pageSize == 5}">5</option>
+    <option value="10" th:selected="${pageSize == 10}">10</option>
+    <option value="20" th:selected="${pageSize == 20}">20</option>
+  </select>
+  <button type="submit">查询</button>
+</form>
+
+<hr/>
+
+<table border="1" cellspacing="0" cellpadding="6">
+  <thead>
+  <tr>
+    <th>ID</th>
+    <th>用户ID</th>
+    <th>科室ID</th>
+    <th>姓名</th>
+    <th>职称</th>
+    <th>擅长</th>
+    <th>简介</th>
+    <th>创建时间</th>
+    <th>操作</th>
+  </tr>
+  </thead>
+
+  <tbody>
+  <tr th:if="${doctorList == null || #lists.isEmpty(doctorList)}">
+    <td colspan="9">暂无数据</td>
+  </tr>
+
+  <tr th:each="d : ${doctorList}">
+    <td th:text="${d.id}"></td>
+    <td th:text="${d.userId}"></td>
+    <td>
+  <span th:each="dept : ${deptList}"
+        th:if="${dept.id == d.deptId}"
+        th:text="${dept.name}">
+  </span>
+    </td>
+    <td th:text="${d.name}"></td>
+    <td th:text="${d.title}"></td>
+    <td th:text="${d.specialty}"></td>
+    <td th:text="${d.intro}"></td>
+    <td th:text="${d.createTime}"></td>
+    <td>
+      <a th:href="@{/doctor/edit-page/{id}(id=${d.id})}">编辑</a>
+      |
+      <a th:href="@{/doctor/delete/{id}(id=${d.id})}"
+         onclick="return confirm('确定删除吗？')">删除</a>
+    </td>
+  </tr>
+  </tbody>
+</table>
+
+<br/>
+
+<div>
+  共 <span th:text="${page.total}"></span> 条，
+  当前第 <span th:text="${page.current}"></span> 页，
+  共 <span th:text="${page.pages}"></span> 页
+</div>
+
+<div style="margin-top:10px;">
+  <!-- 上一页 -->
+  <a th:if="${page.current > 1}"
+     th:href="@{/doctor/list-page(pageNum=${page.current-1}, pageSize=${page.size}, name=${name})}">
+    上一页
+  </a>
+  <span th:if="${page.current <= 1}">上一页</span>
+
+  &nbsp; | &nbsp;
+
+  <!-- 下一页 -->
+  <a th:if="${page.current < page.pages}"
+     th:href="@{/doctor/list-page(pageNum=${page.current+1}, pageSize=${page.size}, name=${name})}">
+    下一页
+  </a>
+  <span th:if="${page.current >= page.pages}">下一页</span>
+
+  &nbsp; | &nbsp;
+
+  <a href="/">返回首页</a>
+</div>
+
+<!--  弹窗提示：新增/修改/删除成功 -->
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const msg = params.get("msg");
+  if (msg) {
+    alert(msg);
+
+    // 弹完窗把 msg 从地址栏去掉，避免刷新重复弹
+    params.delete("msg");
+    const newUrl = window.location.pathname + (params.toString() ? ("?" + params.toString()) : "");
+    window.history.replaceState({}, "", newUrl);
+  }
+</script>
+
+</body>
+</html>

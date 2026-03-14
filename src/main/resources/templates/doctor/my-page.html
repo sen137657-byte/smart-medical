@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title>我的医生档案</title>
+</head>
+<body>
+
+<h2>我的医生档案</h2>
+<hr>
+
+<div style="color:red; font-weight:bold;"
+     th:if="${msg != null}"
+     th:text="${msg}">
+</div>
+
+<div th:if="${doctor != null}">
+  <p>姓名：<span th:text="${doctor.name}">name</span></p>
+  <p>科室ID：<span th:text="${doctor.deptId}">deptId</span></p>
+  <p>职称：<span th:text="${doctor.title}">title</span></p>
+  <p>擅长：<span th:text="${doctor.specialty}">specialty</span></p>
+  <p>简介：<span th:text="${doctor.intro}">intro</span></p>
+  <p>创建时间：<span th:text="${doctor.createTime}">createTime</span></p>
+</div>
+
+<hr>
+<a href="/">返回首页</a>
+
+</body>
+</html>

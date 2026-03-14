@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title>我的患者档案</title>
+</head>
+<body>
+
+<h2>我的患者档案</h2>
+<hr>
+
+<div style="color:red; font-weight:bold;"
+     th:if="${msg != null}"
+     th:text="${msg}">
+</div>
+
+<div th:if="${patient != null}">
+  <p>姓名：<span th:text="${patient.name}">name</span></p>
+  <p>性别：<span th:text="${patient.gender}">gender</span></p>
+  <p>年龄：<span th:text="${patient.age}">age</span></p>
+  <p>手机号：<span th:text="${patient.phone}">phone</span></p>
+  <p>身份证：<span th:text="${patient.idCard}">idCard</span></p>
+  <p>地址：<span th:text="${patient.address}">address</span></p>
+  <p>病史：<span th:text="${patient.medicalHistory}">medicalHistory</span></p>
+</div>
+
+<hr>
+<p><a href="/">返回首页</a></p>
+
+</body>
+</html>

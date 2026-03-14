@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title>编辑患者</title>
+</head>
+<body>
+
+<h2>编辑患者</h2>
+
+<form th:action="@{/patient/update}" method="post">
+  <input type="hidden" name="id" th:value="${patient.id}"/>
+
+  <div>
+    绑定账号（PATIENT）：
+    <select name="userId" required>
+      <option value="">请选择患者账号</option>
+      <option th:each="u : ${patientUserList}"
+              th:value="${u.id}"
+              th:selected="${u.id == patient.userId}"
+              th:text="${u.username + ' (id=' + u.id + ')'}">
+      </option>
+    </select>
+  </div>
+
+  <div>姓名：<input name="name" th:value="${patient.name}" required></div>
+  <div>性别：<input name="gender" th:value="${patient.gender}"></div>
+  <div>年龄：<input type="number" name="age" th:value="${patient.age}"></div>
+  <div>电话：<input name="phone" th:value="${patient.phone}"></div>
+  <div>身份证：<input name="idCard" th:value="${patient.idCard}"></div>
+  <div>地址：<input name="address" th:value="${patient.address}"></div>
+  <div>病史：<input name="medicalHistory" th:value="${patient.medicalHistory}"></div>
+
+  <button type="submit">保存修改</button>
+  <a href="/patient/list-page">返回列表</a>
+</form>
+
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>科室管理</title>
+</head>
+<body>
+<h2>科室管理</h2>
+
+<p>
+  <a href="/">返回首页</a>
+</p>
+
+<hr>
+
+<!-- 新增 / 修改表单（共用） -->
+<h3 id="formTitle">新增科室</h3>
+<div>
+  <!-- 修改时需要 id，新增时为空 -->
+  <input id="deptId" type="hidden">
+
+  科室名称：
+  <input id="deptName" placeholder="例如：骨科">
+  描述：
+  <input id="deptDesc" placeholder="例如：骨科常见疾病诊疗">
+  <button onclick="submitForm()">提交</button>
+  <button onclick="resetForm()">清空</button>
+</div>
+
+<hr>
+
+<!-- 模糊查询 + 每页条数 -->
+<div>
+  科室名称：
+  <input id="searchName" placeholder="输入科室名关键字">
+
+  每页条数：
+  <select id="pageSizeSelect" onchange="changePageSize()">
+    <option value="5">5</option>
+    <option value="10">10</option>
+    <option value="20">20</option>
+  </select>
+
+  <button onclick="loadData(1)">搜索</button>
+  <button onclick="resetSearch()">重置</button>
+</div>
+
+<br>
+
+<!-- 表格 -->
+<table border="1" cellpadding="8" cellspacing="0">
+  <thead>
+  <tr>
+    <th>ID</th>
+    <th>科室名称</th>
+    <th>描述</th>
+    <th>操作</th>
+  </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<br>
+
+<!-- 分页 -->
+<div>
+  <button onclick="prevPage()">上一页</button>
+  <span id="pageInfo"></span>
+  <button onclick="nextPage()">下一页</button>
+</div>
+
+<script>
+  let pageNum = 1;
+  let pageSize = 5;
+  let totalPages = 1;
+
+  window.onload = function () {
+    // 1) pageSize 下拉同步
+    document.getElementById("pageSizeSelect").value = String(pageSize);
+
+    // 2) 如果 URL 带 msg：弹一次窗，然后去掉 msg（去重）
+    const params = new URLSearchParams(window.location.search);
+    const msg = params.get("msg");
+    if (msg) {
+      alert(msg);
+      params.delete("msg");
+      const newUrl = window.location.pathname + (params.toString() ? ("?" + params.toString()) : "");
+      window.history.replaceState({}, "", newUrl);
+    }
+
+    // 3) 加载数据
+    loadData(1);
+  }
+
+  // ======= msg 弹窗 + 写入 URL（并自动去重） =======
+  function showMsg(message) {
+    alert(message);
+
+    // 把 msg 写进地址栏（便于“像医生那样”有痕迹）
+    const params = new URLSearchParams(window.location.search);
+    params.set("msg", message);
+    const newUrl = window.location.pathname + "?" + params.toString();
+    window.history.replaceState({}, "", newUrl);
+
+    // 再立刻去掉 msg，避免刷新重复弹
+    params.delete("msg");
+    const cleanUrl = window.location.pathname + (params.toString() ? ("?" + params.toString()) : "");
+    window.history.replaceState({}, "", cleanUrl);
+  }
+
+  // ======= pageSize 切换 =======
+  function changePageSize() {
+    const v = document.getElementById("pageSizeSelect").value;
+    pageSize = Number(v);
+    loadData(1);
+  }
+
+  // ======= 查询/分页 =======
+  function resetSearch() {
+    document.getElementById("searchName").value = "";
+    loadData(1);
+  }
+
+  function prevPage() {
+    if (pageNum > 1) loadData(pageNum - 1);
+  }
+
+  function nextPage() {
+    if (pageNum < totalPages) loadData(pageNum + 1);
+  }
+
+  function loadData(p) {
+    pageNum = p;
+    const name = document.getElementById("searchName").value.trim();
+
+    let url = `/dept/page?pageNum=${pageNum}&pageSize=${pageSize}`;
+    if (name) url += `&name=${encodeURIComponent(name)}`;
+
+    fetch(url)
+            .then(resp => resp.json())
+            .then(res => {
+              if (!res.success) {
+                alert(res.message || "查询失败");
+                return;
+              }
+
+              const pageData = res.data;
+              const records = pageData.records || [];
+              totalPages = pageData.pages || 1;
+
+              const tbody = document.getElementById("tbody");
+              tbody.innerHTML = "";
+
+              records.forEach(d => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                        <td>${d.id}</td>
+                        <td>${d.name}</td>
+                        <td>${d.description || ""}</td>
+                        <td>
+                            <button onclick="editDept(${d.id})">编辑</button>
+                            <button onclick="deleteDept(${d.id})">删除</button>
+                        </td>
+                    `;
+                tbody.appendChild(tr);
+              });
+
+              document.getElementById("pageInfo").innerText =
+                      `第 ${pageData.current} 页 / 共 ${pageData.pages} 页（总数：${pageData.total}）`;
+            })
+            .catch(err => {
+              console.error(err);
+              alert("请求失败，请检查后端是否启动");
+            });
+  }
+
+  // ======= 新增/修改 =======
+  function resetForm() {
+    document.getElementById("deptId").value = "";
+    document.getElementById("deptName").value = "";
+    document.getElementById("deptDesc").value = "";
+    document.getElementById("formTitle").innerText = "新增科室";
+  }
+
+  function submitForm() {
+    const id = document.getElementById("deptId").value.trim();
+    const name = document.getElementById("deptName").value.trim();
+    const description = document.getElementById("deptDesc").value.trim();
+
+    if (!name) {
+      alert("科室名称不能为空");
+      return;
+    }
+
+    // 有 id => 修改；无 id => 新增
+    if (id) {
+      fetch("/dept/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: Number(id), name, description })
+      })
+              .then(resp => resp.json())
+              .then(res => {
+                if (res.success) {
+                  showMsg("修改成功");
+                  resetForm();
+                  loadData(pageNum);
+                } else {
+                  alert(res.message || "修改失败");
+                }
+              })
+              .catch(err => {
+                console.error(err);
+                alert("请求失败，请检查后端是否启动");
+              });
+    } else {
+      fetch("/dept/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description })
+      })
+              .then(resp => resp.json())
+              .then(res => {
+                if (res.success) {
+                  showMsg("新增成功");
+                  resetForm();
+                  loadData(1);
+                } else {
+                  alert(res.message || "新增失败");
+                }
+              })
+              .catch(err => {
+                console.error(err);
+                alert("请求失败，请检查后端是否启动");
+              });
+    }
+  }
+
+  // 点击编辑：拉详情回填表单
+  function editDept(id) {
+    fetch(`/dept/detail/${id}`)
+            .then(resp => resp.json())
+            .then(res => {
+              if (!res.success) {
+                alert(res.message || "查询详情失败");
+                return;
+              }
+              const d = res.data;
+              document.getElementById("deptId").value = d.id;
+              document.getElementById("deptName").value = d.name || "";
+              document.getElementById("deptDesc").value = d.description || "";
+              document.getElementById("formTitle").innerText = "修改科室";
+            })
+            .catch(err => {
+              console.error(err);
+              alert("请求失败，请检查后端是否启动");
+            });
+  }
+
+  // ======= 删除 =======
+  function deleteDept(id) {
+    if (!confirm("确定删除该科室吗？")) return;
+
+    fetch(`/dept/delete/${id}`, { method: "DELETE" })
+            .then(resp => resp.json())
+            .then(res => {
+              if (res.success) {
+                showMsg("删除成功");
+                loadData(pageNum);
+              } else {
+                alert(res.message || "删除失败");
+              }
+            })
+            .catch(err => {
+              console.error(err);
+              alert("请求失败，请检查后端是否启动");
+            });
+  }
+</script>
+
+</body>
+</html>

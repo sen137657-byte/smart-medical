@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>医生在线问诊</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      border: 1px solid #ddd;
+    }
+    .tag-waiting { background: #f3f3f3; color: #333; border-color: #d6d6d6; }
+    .tag-replied { background: #e9f7ef; color: #0a7a2f; border-color: #bfe7cf; }
+    .tag-closed  { background: #fdecec; color: #b00020; border-color: #f3b8c2; }
+
+    .panel { margin-top: 14px; border: 1px solid #ccc; padding: 10px; }
+    textarea { width: 100%; box-sizing: border-box; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<h2>医生在线问诊</h2>
+
+<div id="app">
+
+  <div style="margin-bottom: 10px;">
+    <button @click="loadList">刷新</button>
+
+    状态筛选：
+    <select v-model="statusFilter" @change="loadList">
+      <option value="">全部</option>
+      <option value="WAITING">待回复</option>
+      <option value="REPLIED">已回复</option>
+      <option value="CLOSED">已关闭</option>
+    </select>
+
+    <span style="margin-left: 10px;">总数：{{ list.length }}</span>
+  </div>
+
+  <table cellspacing="0" cellpadding="6">
+    <tr>
+      <th style="width:70px;">ID</th>
+      <th style="width:120px;">患者姓名</th>
+      <th>病情描述</th>
+      <th style="width:110px;">状态</th>
+      <th style="width:160px;">发起时间</th>
+      <th style="width:160px;">操作</th>
+    </tr>
+
+    <tr v-for="item in list" :key="item.id">
+      <td>{{ item.id }}</td>
+      <td>{{ item.patientName }}</td>
+      <td style="max-width: 520px;">{{ item.content }}</td>
+
+      <td>
+        <span class="tag"
+              :class="statusTagClass(item.status)">
+          {{ item.statusText || statusText(item.status) }}
+        </span>
+      </td>
+
+      <td>{{ formatTime(item.createTime) }}</td>
+      <td>
+        <button v-if="item.status === 'WAITING'" @click="openReply(item)">
+          回复
+        </button>
+        <button @click="loadReplies(item.id)">查看回复</button>
+      </td>
+    </tr>
+  </table>
+
+  <hr>
+
+  <div v-if="replyBoxVisible" class="panel">
+    <h3>回复问诊</h3>
+
+    <div>问诊ID：{{ currentItem.id }}</div>
+    <div>患者：{{ currentItem.patientName }}</div>
+    <div style="margin-top: 6px;">病情：{{ currentItem.content }}</div>
+
+    <div style="margin-top: 10px;">
+      回复内容：
+      <br>
+      <textarea v-model="replyContent" rows="4" placeholder="请输入回复内容..."></textarea>
+    </div>
+
+    <div style="margin-top: 10px;">
+      <button @click="submitReply">提交回复</button>
+      <button @click="closeReply">取消</button>
+    </div>
+  </div>
+
+  <hr>
+
+  <div v-if="repliesVisible" class="panel">
+    <h3>回复记录（问诊ID：{{ repliesConsultationId }}）</h3>
+
+    <table cellspacing="0" cellpadding="6">
+      <tr>
+        <th style="width:120px;">回复医生</th>
+        <th>回复内容</th>
+        <th style="width:160px;">回复时间</th>
+      </tr>
+
+      <tr v-for="r in replies" :key="r.id">
+        <td>{{ r.doctorName }}</td>
+        <td style="max-width: 520px;">{{ r.content }}</td>
+        <td>{{ formatTime(r.replyTime) }}</td>
+      </tr>
+    </table>
+
+    <div style="margin-top: 10px;">
+      <button @click="closeReplies">关闭</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  new Vue({
+    el: '#app',
+    data: {
+      statusFilter: '',
+      list: [],
+
+      replyBoxVisible: false,
+      currentItem: {},
+      replyContent: '',
+
+      repliesVisible: false,
+      repliesConsultationId: null,
+      replies: []
+    },
+    mounted() {
+      this.loadList();
+    },
+    methods: {
+
+      loadList() {
+        let url = '/api/consultation/doctor/vo';
+        if (this.statusFilter) {
+          url += '?status=' + this.statusFilter;
+        }
+
+        axios.get(url).then(res => {
+          if (res.data && res.data.success) {
+            this.list = res.data.data || [];
+          } else {
+            alert(res.data.message || '加载失败');
+          }
+        }).catch(() => alert('加载失败：请检查 /api/consultation/doctor/vo'));
+      },
+
+      openReply(item) {
+        this.currentItem = item;
+        this.replyContent = '';
+        this.replyBoxVisible = true;
+      },
+
+      closeReply() {
+        this.replyBoxVisible = false;
+        this.currentItem = {};
+        this.replyContent = '';
+      },
+
+      submitReply() {
+        if (!this.replyContent || this.replyContent.trim() === '') {
+          alert('回复内容不能为空');
+          return;
+        }
+
+        axios.post('/api/consultation/' + this.currentItem.id + '/reply', {
+          replyContent: this.replyContent
+        }).then(res => {
+          if (res.data && res.data.success) {
+            alert('回复成功');
+            this.closeReply();
+            this.loadList();
+          } else {
+            alert(res.data.message || '回复失败');
+          }
+        }).catch(() => alert('回复失败：请检查 /api/consultation/{id}/reply'));
+      },
+
+      loadReplies(id) {
+        axios.get('/api/consultation/' + id + '/replies')
+                .then(res => {
+                  if (res.data && res.data.success) {
+                    this.repliesConsultationId = id;
+                    this.replies = res.data.data || [];
+                    this.repliesVisible = true;
+                  } else {
+                    alert(res.data.message || '加载回复失败');
+                  }
+                })
+                .catch(() => alert('加载回复失败：请检查 /api/consultation/{id}/replies'));
+      },
+
+      closeReplies() {
+        this.repliesVisible = false;
+        this.repliesConsultationId = null;
+        this.replies = [];
+      },
+
+      // 兜底（如果后端没给 statusText）
+      statusText(status) {
+        if (status === 'WAITING') return '待回复';
+        if (status === 'REPLIED') return '已回复';
+        if (status === 'CLOSED') return '已关闭';
+        return status;
+      },
+
+      statusTagClass(status) {
+        if (status === 'WAITING') return 'tag-waiting';
+        if (status === 'REPLIED') return 'tag-replied';
+        if (status === 'CLOSED')  return 'tag-closed';
+        return '';
+      },
+
+      formatTime(t) {
+        if (!t) return '';
+        return String(t).replace('T', ' ').substring(0, 19);
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

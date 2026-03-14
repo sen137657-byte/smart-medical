@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title>新增患者</title>
+</head>
+<body>
+
+<h2>新增患者</h2>
+
+<p>
+  <a href="/patient/list-page">返回列表</a> |
+  <a href="/">返回首页</a>
+</p>
+
+<p th:if="${param.msg != null and param.msg[0] == 'duplicate_user'}" style="color:red;">
+  该账号已建档，请换一个患者账号
+</p>
+
+<form method="post" action="/patient/add">
+
+  <div>
+    绑定账号（PATIENT）：
+    <select name="userId" required>
+      <option value="">请选择患者账号</option>
+      <option th:each="u : ${patientUserList}"
+              th:value="${u.id}"
+              th:text="${u.username + ' (id=' + u.id + ')'}">
+      </option>
+    </select>
+  </div>
+
+  <div>姓名：<input name="name" required></div>
+  <div>性别：<input name="gender" placeholder="男/女"></div>
+  <div>年龄：<input type="number" name="age"></div>
+  <div>电话：<input name="phone"></div>
+  <div>身份证：<input name="idCard"></div>
+  <div>地址：<input name="address"></div>
+  <div>病史：<input name="medicalHistory"></div>
+
+  <button type="submit">提交</button>
+</form>
+
+</body>
+</html>

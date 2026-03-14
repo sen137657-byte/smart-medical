@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title>新增医生</title>
+</head>
+<body>
+
+<h1>新增医生</h1>
+
+<p>
+  <a href="/doctor/list-page">返回列表</a> |
+  <a href="/">返回首页</a>
+</p>
+
+<!-- 如果后端重定向带 msg 参数，则提示 -->
+<p th:if="${param.msg != null and param.msg[0] == 'duplicate_user'}" style="color:red;">
+  该账号已建档（user_id 已存在），请换一个医生账号
+</p>
+
+<form method="post" action="/doctor/add">
+
+  <!-- ===== 绑定账号 ===== -->
+  <div>
+    绑定账号（sys_user）：
+    <select name="userId" required>
+      <option value="">请选择医生账号</option>
+
+      <option th:each="u : ${doctorUserList}"
+              th:value="${u.id}"
+              th:disabled="${u.status != 1}"
+              th:text="${u.username + ' | ' + u.role + ' | ' + (u.status == 1 ? '启用' : '禁用') + ' | id=' + u.id}">
+      </option>
+
+    </select>
+  </div>
+
+  <br/>
+
+  <!-- ===== 所属科室 ===== -->
+  <div>
+    所属科室：
+    <select name="deptId" required>
+      <option value="">请选择科室</option>
+
+      <option th:each="d : ${deptList}"
+              th:value="${d.id}"
+              th:text="${d.name + ' (id=' + d.id + ')'}">
+      </option>
+
+    </select>
+  </div>
+
+  <br/>
+
+  <!-- ===== 医生信息 ===== -->
+  <div>
+    医生姓名：
+    <input name="name" required>
+  </div>
+
+  <br/>
+
+  <div>
+    职称：
+    <input name="title">
+  </div>
+
+  <br/>
+
+  <div>
+    擅长：
+    <input name="specialty">
+  </div>
+
+  <br/>
+
+  <div>
+    简介：
+    <input name="intro">
+  </div>
+
+  <br/>
+
+  <button type="submit">提交</button>
+
+</form>
+
+</body>
+</html>

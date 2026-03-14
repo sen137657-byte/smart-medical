@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>患者在线问诊</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  <style>
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #333; padding: 6px 10px; }
+    .btn { padding: 4px 10px; cursor: pointer; }
+    .btn-primary { border: 1px solid #333; background: #fff; }
+    .panel { margin-top: 16px; padding: 12px; border: 1px solid #999; }
+    .muted { color: #666; font-size: 13px; }
+
+    /* ✅ 和医生端统一：胶囊状态标签 */
+    .status-tag{
+      display:inline-block;
+      padding:2px 10px;
+      border-radius:999px;
+      font-size:12px;
+      border:1px solid #ddd;
+      line-height:18px;
+    }
+    .status-waiting{ background:#f2f2f2; color:#333; }
+    .status-replied{ background:#e8f5e9; color:#1b5e20; border-color:#c8e6c9; }
+    .status-closed { background:#eef2ff; color:#2b3a67; border-color:#d7ddff; }
+  </style>
+</head>
+<body>
+
+<h2>患者在线问诊</h2>
+
+<div id="app">
+
+  <h3>发起问诊</h3>
+
+  <div>
+    医生：
+    <select v-model="doctorId">
+      <option value="">-- 请选择医生 --</option>
+      <option v-for="d in doctors" :key="d.id" :value="d.id">
+        {{ d.name }} | {{ d.deptName || '未分配科室' }} | 擅长：{{ d.specialty || '暂无' }}
+      </option>
+    </select>
+  </div>
+
+  <div style="margin-top: 8px;">
+    病情描述：
+    <br>
+    <textarea v-model="content" rows="4" cols="60" placeholder="请描述症状、持续时间、既往史等"></textarea>
+  </div>
+
+  <div style="margin-top: 8px;">
+    <button class="btn btn-primary" @click="createConsultation">提交问诊</button>
+    <span class="muted" style="margin-left: 10px;">建议：描述越具体，医生回复越准确</span>
+  </div>
+
+  <hr>
+
+  <h3>我的问诊列表</h3>
+
+  <button class="btn btn-primary" @click="loadList">刷新</button>
+  <span style="margin-left: 10px;">总数：{{ list.length }}</span>
+
+  <table style="margin-top: 10px;">
+    <tr>
+      <th>ID</th>
+      <th>医生</th>
+      <th>病情描述</th>
+      <th>状态</th>
+      <th>时间</th>
+      <th>操作</th>
+    </tr>
+
+    <tr v-for="item in list" :key="item.id">
+      <td>{{ item.id }}</td>
+
+      <!--  现在后端已返回 doctorName -->
+      <td>{{ item.doctorName || getDoctorName(item.doctorId) }}</td>
+
+      <td style="max-width: 260px;">{{ item.content }}</td>
+
+      <!-- 统一为胶囊标签，优先用 statusText -->
+      <td>
+        <span class="status-tag" :class="statusClass(item.status)">
+          {{ item.statusText || statusTextFallback(item.status) }}
+        </span>
+      </td>
+
+      <td>{{ formatTime(item.createTime || item.create_time) }}</td>
+
+      <td>
+        <button
+                class="btn btn-primary"
+                v-if="item.status === 'REPLIED'"
+                @click="openReplies(item)">
+          查看回复
+        </button>
+        <span v-else>-</span>
+      </td>
+    </tr>
+  </table>
+
+  <div class="panel" v-if="replyPanelVisible">
+    <h3>回复记录（问诊ID：{{ currentConsultation.id }}）</h3>
+    <div class="muted" style="margin-bottom: 8px;">
+      医生：{{ currentConsultation.doctorName || getDoctorName(currentConsultation.doctorId) }}；
+      病情：{{ currentConsultation.content }}
+    </div>
+
+    <table>
+      <tr>
+        <th>回复医生</th>
+        <th>回复内容</th>
+        <th>回复时间</th>
+      </tr>
+      <tr v-for="r in replies" :key="r.id">
+        <td>{{ r.doctorName || getDoctorName(r.doctorId) }}</td>
+        <td style="max-width: 420px;">{{ r.content }}</td>
+        <td>{{ formatTime(r.replyTime) }}</td>
+      </tr>
+    </table>
+
+    <div style="margin-top: 10px;">
+      <button class="btn btn-primary" @click="closeReplies">关闭</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  new Vue({
+    el: '#app',
+    data: {
+      doctors: [],
+      doctorId: '',
+      content: '',
+      list: [],
+      replyPanelVisible: false,
+      currentConsultation: {},
+      replies: []
+    },
+    mounted() {
+      this.loadDoctors();
+      this.loadList();
+    },
+    methods: {
+
+      loadDoctors() {
+        axios.get('/api/doctor/options')
+                .then(res => {
+                  if (res.data && res.data.success) {
+                    this.doctors = res.data.data || [];
+                  } else {
+                    alert((res.data && res.data.message) ? res.data.message : '加载医生失败');
+                  }
+                })
+                .catch(() => alert('加载医生失败：请确认 /api/doctor/options 可访问'));
+      },
+
+      // 兜底：如果 doctorName 为空，用 options 列表映射
+      getDoctorName(doctorId) {
+        const d = this.doctors.find(x => x.id == doctorId);
+        return d ? d.name : ('医生ID:' + doctorId);
+      },
+
+      createConsultation() {
+        if (!this.doctorId) {
+          alert('请选择医生');
+          return;
+        }
+        if (!this.content || this.content.trim().length < 2) {
+          alert('请填写病情描述（至少2个字）');
+          return;
+        }
+
+        axios.post('/api/consultation', {
+          doctorId: this.doctorId,
+          content: this.content
+        }).then(res => {
+          if (res.data && res.data.success) {
+            alert('提交成功');
+            this.content = '';
+            this.loadList();
+          } else {
+            alert((res.data && res.data.message) ? res.data.message : '提交失败');
+          }
+        }).catch(() => alert('提交失败：请检查后端接口 /api/consultation'));
+      },
+
+      //  后端现在返回 ConsultationPatientVO（doctorName/statusText）
+      loadList() {
+        axios.get('/api/consultation/patient')
+                .then(res => {
+                  if (res.data && res.data.success) {
+                    this.list = res.data.data || [];
+                  } else {
+                    alert((res.data && res.data.message) ? res.data.message : '加载失败');
+                  }
+                })
+                .catch(() => alert('加载失败：请检查 /api/consultation/patient'));
+      },
+
+      openReplies(item) {
+        this.replyPanelVisible = true;
+        this.currentConsultation = item;
+        this.replies = [];
+
+        axios.get('/api/consultation/' + item.id + '/replies')
+                .then(res => {
+                  if (res.data && res.data.success) {
+                    this.replies = res.data.data || [];
+                  } else {
+                    alert((res.data && res.data.message) ? res.data.message : '加载回复失败');
+                  }
+                })
+                .catch(() => alert('加载回复失败：请检查 /api/consultation/{id}/replies'));
+      },
+
+      closeReplies() {
+        this.replyPanelVisible = false;
+        this.currentConsultation = {};
+        this.replies = [];
+      },
+
+      formatTime(val) {
+        if (!val) return '';
+        if (typeof val === 'string') {
+          return val.replace('T', ' ').substring(0, 19);
+        }
+        return val;
+      },
+
+      //  状态标签颜色
+      statusClass(status) {
+        if (status === 'REPLIED') return 'status-replied';
+        if (status === 'CLOSED') return 'status-closed';
+        return 'status-waiting'; // WAITING 默认灰
+      },
+
+      // 兜底：如果后端没给 statusText，也能显示中文
+      statusTextFallback(status) {
+        if (status === 'WAITING') return '待回复';
+        if (status === 'REPLIED') return '已回复';
+        if (status === 'CLOSED') return '已关闭';
+        return status || '未知状态';
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

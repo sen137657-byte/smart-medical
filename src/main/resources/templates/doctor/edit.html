@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title>编辑医生</title>
+</head>
+<body>
+
+<h2>编辑医生</h2>
+
+<form th:action="@{/doctor/update}" method="post">
+  <!-- 必须带 id -->
+  <input type="hidden" name="id" th:value="${doctor.id}"/>
+
+  <!-- 账号选择：下拉 -->
+  <div>
+    绑定账号（sys_user）：
+    <select name="userId" required>
+      <option value="">请选择账号</option>
+
+      <option th:each="u : ${doctorUserList}"
+              th:value="${u.id}"
+              th:selected="${u.id == doctor.userId}"
+              th:disabled="${u.status != 1}"
+              th:text="${u.username + ' | ' + u.role + ' | ' + (u.status == 1 ? '启用' : '禁用') + ' | id=' + u.id}">
+      </option>
+    </select>
+  </div>
+
+  <!-- 科室选择：下拉 -->
+  <div>
+    科室：
+    <select name="deptId" required>
+      <option value="">请选择科室</option>
+
+      <option th:each="d : ${deptList}"
+              th:value="${d.id}"
+              th:selected="${d.id == doctor.deptId}"
+              th:text="${d.name + ' (id=' + d.id + ')'}">
+      </option>
+    </select>
+  </div>
+
+  <div>
+    医生姓名：
+    <input type="text" name="name" th:value="${doctor.name}" required>
+  </div>
+
+  <div>
+    职称：
+    <input type="text" name="title" th:value="${doctor.title}">
+  </div>
+
+  <div>
+    擅长：
+    <input type="text" name="specialty" th:value="${doctor.specialty}">
+  </div>
+
+  <div>
+    简介：
+    <input type="text" name="intro" th:value="${doctor.intro}">
+  </div>
+
+  <button type="submit">保存修改</button>
+  <a href="/doctor/list-page">返回列表</a>
+</form>
+
+</body>
+</html>

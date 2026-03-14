@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>登录 - 智慧医疗系统</title>
+</head>
+<body>
+
+<h2>智慧医疗系统登录</h2>
+
+<!-- 提示区域 -->
+
+<!-- URL 参数提示：/login?msg=xxx -->
+<div style="color:red; font-weight:bold;"
+     th:if="${param.msg != null}"
+     th:text="${param.msg}">
+</div>
+
+<!-- 登录失败提示（后端传 error） -->
+<div style="color:red; font-weight:bold;"
+     th:if="${error != null}"
+     th:text="${error}">
+</div>
+
+<!-- 统一提示：Controller 放入 model 的 msg（来自 session.msg） -->
+<div style="color:red; font-weight:bold;"
+     th:if="${msg != null}"
+     th:text="${msg}">
+</div>
+
+<hr>
+
+<!-- 登录表单 -->
+<form method="post" action="/auth/login">
+
+  <div>
+    <label>账号：</label>
+    <input type="text" name="username" placeholder="请输入账号" required>
+  </div>
+
+  <br>
+
+  <div>
+    <label>密码：</label>
+    <input type="password" name="password" placeholder="请输入密码" required>
+  </div>
+
+  <br>
+
+  <button type="submit">登录</button>
+
+</form>
+
+<!-- 弹窗提示（可选） -->
+<script th:inline="javascript">
+  /*<![CDATA[*/
+  const urlMsg = /*[[${param.msg != null ? param.msg[0] : null}]]*/ null;
+  if (urlMsg) alert(urlMsg);
+
+  const modelMsg = /*[[${msg}]]*/ null;
+  if (modelMsg) alert(modelMsg);
+  /*]]>*/
+</script>
+
+</body>
+</html>
